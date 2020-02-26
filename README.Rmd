@@ -1,0 +1,92 @@
+---
+title: "Readme"
+author: "bodi yang"
+date: "2/25/2020"
+output: md_document
+---
+# Analysis of the relationship of bridge conditation and unemployed rate 
+
+In this analysis, I will use the bridge data and labour data of 2018 Califorinia. Firstly, I tidy up the raw bridge data and labour data, labeling the bridge data into structure number, place code, year built, deck condition, superstructure condition, substructure condition, location, county code; labeling the labour data into Area Code, State, County, Area Title, Period, Civilian_Labor_Force, Employed, Unemployed_Level, Unemployed_Rate
+
+Then, I merge the bridge and labour data of 2018 California together.
+
+After the data preparation, I built up three models:
+1. linear regression of unemployed rate with the factors: bridge deck condition, bridge superstructure and bridge substructure
+2. linear regression of unemployed number with the factors: bridge deck condition, bridge superstructure and bridge substructure
+3. linear model to predict unemployed rate based on previous month
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+bridge_cleaned=read.csv('https://www.fhwa.dot.gov/bridge/nbi/2018/delimited/CA18.txt') %>% 
+  select(STRUCTURE_NUMBER_008,PLACE_CODE_004,YEAR_BUILT_027,DECK_COND_058,SUPERSTRUCTURE_COND_059,SUBSTRUCTURE_COND_060,LOCATION_009, COUNTY_CODE_003) %>% 
+  mutate(Duration = 2018 - YEAR_BUILT_027) %>% 
+  filter(Duration < 200)
+
+BLS=read.csv('https://www.bls.gov/web/metro/laucntycur14.txt',skip = 6,sep = '|',header = F,colClasses = 'character')
+colnames(BLS)=c("LAUS Area Code","State","County","Area Title","Period","Civilian_Labor_Force","Employed","Unemployed_Level","Unemployed_Rate")
+
+BLS.CA=filter(BLS,State == '  06  ' & Period=='   Nov-19  ')
+BLS.CA$County=as.numeric(BLS.CA$County)
+BLS.CA$Civilian_Labor_Force=as.numeric(gsub(",", "", BLS.CA$Civilian_Labor_Force))
+BLS.CA$Employed=as.numeric(gsub(",", "", BLS.CA$Employed))
+BLS.CA$Unemployed_Level=as.numeric(gsub(",", "", BLS.CA$Unemployed_Level))
+BLS.CA$Unemployed_Rate=as.numeric(BLS.CA$Unemployed_Rate)
+
+data.final=left_join(bridge_cleaned,BLS.CA,by = c("COUNTY_CODE_003" = "County"))
+
+
+```
+
+## Linear model for unemployed rate with the factors: bridge deck condition, bridge superstructure and bridge substructure
+We can build up a model of multivariate linear regression of the unemployed rate and the bridge deck condition, superstructure & substructure.
+
+```{r}
+
+lmUnemployedRate = lm(Unemployed_Rate~DECK_COND_058 + SUPERSTRUCTURE_COND_059 + SUBSTRUCTURE_COND_060 , data=data.final)
+
+summary(lmUnemployedRate)
+```
+
+From the result of the regression, we can see the model of the unemployed rate and the bridge deck condition, superstructure & substructure can be written as:
+Unemployedment Rate = 4.10 + (1.38 * deck condition) + (-0.64 * superstructure condition) + (-0.23 * substructure condition)
+
+
+Therefore, once we have the index of deck condition, superstructure condition and substructure condion of a bridge, we would be able to predict the unemployment number in this state
+
+## Linear model for unemployed number with the factors: bridge deck condition, bridge superstructure and bridge substructure
+
+
+We can build up a model of multivariate linear regression of the unemployed number and the bridge deck condition, superstructure & substructure.
+
+```{r}
+lmUnemployed = lm(Unemployed_Level~DECK_COND_058 + SUPERSTRUCTURE_COND_059 + SUBSTRUCTURE_COND_060 , data=data.final)
+
+summary(lmUnemployed)
+```
+
+From the result of the regression, we can see the model of the unemployed rate and the bridge deck condition, superstructure & substructure can be written as:
+Unemployedment Number = 293 + (51580 * deck condition) + (-11767 * superstructure condition) + (-379 * substructure condition); 
+
+Therefore, once we have the index of deck condition, superstructure condition and substructure condion of a bridge, we would be able to predict the unemployment number in this state
+
+## Linear model for the prediction of next month's unemployed rate/number: bridge deck condition, bridge superstructure & bridge substructure and time factor
+
+
+Compared with the previous two models, we need to take the time into consideration.
+
+
+So to speak, we can build up a model of multivariate linear regression of the unemployed number and the bridge deck condition, superstructure & substructure and also the time components. In the model I added Year_Built as a time factor: Unemployed_Level~DECK_COND_058 + SUPERSTRUCTURE_COND_059 + SUBSTRUCTURE_COND_060 + YEAR_BUILT_027
+
+```{r}
+lmUnemployed = lm(Unemployed_Level~DECK_COND_058 + SUPERSTRUCTURE_COND_059 + SUBSTRUCTURE_COND_060 + YEAR_BUILT_027, data=data.final)
+
+summary(lmUnemployed)
+```
+
+
+From the result of the regression, we can see the model of the unemployed rate and the bridge deck condition, superstructure & substructure can be written as:
+Unemployedment Number = 389989 + (51661 * deck condition) + (-6444 * superstructure condition) + (-2554 * substructure condition) + (-200 * year built); 
+
+Therefore, once we have the index of deck condition, superstructure condition and substructure condion of a bridge, we would be able to predict the unemployment number in this state
